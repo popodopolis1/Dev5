@@ -162,6 +162,12 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Export.cpp" />
+    <ClCompile Include="Facade.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Export.h" />
+    <ClInclude Include="Facade.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
