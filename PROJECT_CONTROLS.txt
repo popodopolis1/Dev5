@@ -1,0 +1,10 @@
+---Project Controls---
+
+-Camera-
+W,A,S,D = Standard Camera Movement
+Left Click = Rotate Camera
+Space = Move Camera Straight Up
+Left Shift = Move Camera Straight Down
+
+-Rendering-
+Q = Turn Wireframe Mesh On and Off

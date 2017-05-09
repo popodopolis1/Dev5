@@ -19,7 +19,6 @@ using namespace DirectX;
 #include "DDSTextureLoader.h"
 #include "Export.h"
 
-
 class WIN_APP
 {
 #pragma region Privates
@@ -110,7 +109,7 @@ public:
 
 	ID3D11Buffer* debugBuffer;
 	D3D11_BUFFER_DESC debugBuffDesc;
-	vector<debugVert> debugArray[1024];
+	debugVert debugArray[1024];
 	ID3D11VertexShader *debugVertshader;
 	ID3D11PixelShader *debugPixshader; 
 	ID3D11InputLayout *debugInputlayout;
@@ -128,6 +127,10 @@ public:
 	vector<ID3D11Buffer*> boneConstant;
 	D3D11_BUFFER_DESC boneConstantdesc;
 
+	XMVECTOR vecArray[37];
+
+	bool wireDraw = false;
+
 #pragma endregion
 
 	WIN_APP(HINSTANCE hinst, WNDPROC proc);
@@ -144,17 +147,19 @@ void WIN_APP::add_debug_line(XMVECTOR pointA, XMVECTOR pointB, float color[4])
 	tmp.clr[1] = color[1];
 	tmp.clr[2] = color[2];
 	tmp.clr[3] = color[3];
-	debugArray->push_back(tmp);
+	debugArray[count] = tmp;
+
+	count++;
 
 	debugVert tmp2;
-	tmp2.pos = pointA;
+	tmp2.pos = pointB;
 	tmp2.clr[0] = color[0];
 	tmp2.clr[1] = color[1];
 	tmp2.clr[2] = color[2];
 	tmp2.clr[3] = color[3]; 
-	debugArray->push_back(tmp2);
+	debugArray[count] = tmp2;
 
-	count += 2;
+	count++;
 }
 
 XMMATRIX floatArrayToMatrix(float arr[16])
@@ -371,7 +376,7 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	unsigned int* teddyIndicies = new unsigned int[teddyVertCount];
 
 	DllExport::PNUVertex* teddyArray = &verts[0];
-	for (unsigned int i = 0; i < teddyVertCount; i++)
+	for (int i = 0; i < teddyVertCount; i++)
 	{
 		teddyVerts[i].pos = { teddyArray[i].mPosition.x, teddyArray[i].mPosition.y, teddyArray[i].mPosition.z, 0.0f };
 		teddyVerts[i].color = { 0, 0, 0, 0 };
@@ -429,7 +434,7 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	bonefbxVerts = fac.LoadFBX(bonefbxVerts, "Bone.fbx");
 
 
-	int boneVerts = bonefbxVerts.size();
+	int boneVerts = (int)bonefbxVerts.size();
 	boneVertcount = boneVerts;
 	int boneIndexes = boneVerts;
 
@@ -482,7 +487,7 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	for (size_t i = 0; i < teddyJoints.size(); i++)
 	{
 		World bone;
-		DllExport::JointMatrix boneJoint;
+		//DllExport::JointMatrix boneJoint;
 		bone.WorldMatrix = jointMats[i];
 		boneWorld.push_back(bone);
 	}
@@ -514,7 +519,7 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	debugBuffDesc.Usage = D3D11_USAGE_DYNAMIC;
 	debugBuffDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	debugBuffDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	debugBuffDesc.ByteWidth = sizeof(debugVert) * 37;
+	debugBuffDesc.ByteWidth = sizeof(debugVert) * 1024;
 	debugBuffDesc.MiscFlags = 0;
 	debugBuffDesc.StructureByteStride = 0;
 
@@ -523,7 +528,7 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	//InitData.SysMemPitch = 0;
 	//InitData.SysMemSlicePitch = 0;
 
-	InitData.pSysMem = &debugArray[0];
+	InitData.pSysMem = &debugArray;
 	device->CreateBuffer(&debugBuffDesc, &InitData, &debugBuffer);
 #pragma endregion
 
@@ -625,16 +630,40 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	view.ProjectionMatrix = projection;
 #pragma endregion
 
-
+#pragma region Joint and Skeleton Initialization
 	for (int i = 0; i < teddyJoints.size(); i++)
 	{
 		XMVECTOR vec;
 		vec.m128_f32[0] = teddyJoints[i].global_xform[12];
 		vec.m128_f32[1] = teddyJoints[i].global_xform[13];
 		vec.m128_f32[2] = teddyJoints[i].global_xform[14];
-		vec.m128_f32[3] = teddyJoints[i].global_xform[15];
+		vec.m128_f32[3] = 1.0f;
 		teddyDebugPos.push_back(vec);
 	}
+
+	for (int i = 0; i < 1024; i++)
+	{
+		debugVert tmp;
+		tmp.pos = teddyDebugPos[0];
+		tmp.clr[0] = 0.0f;
+		tmp.clr[1] = 0.0f;
+		tmp.clr[2] = 0.0f;
+		tmp.clr[3] = 0.0f;
+		debugArray[i] = tmp;
+	}
+
+	for (int i = 0; i < teddyJoints.size(); i++)
+	{
+
+			XMVECTOR vec;
+			vec.m128_f32[0] = teddyJoints[i].global_xform[12];
+			vec.m128_f32[1] = teddyJoints[i].global_xform[13];
+			vec.m128_f32[2] = teddyJoints[i].global_xform[14];
+			vec.m128_f32[3] = 1.0f;
+
+			vecArray[i] = vec;
+	}
+#pragma endregion
 
 }
 
@@ -706,6 +735,11 @@ bool WIN_APP::Run()
 	view.ViewMatrix = XMMatrixInverse(0, view.ViewMatrix);
 
 	point = newPos;
+
+	if (GetAsyncKeyState('Q') & 0x1)
+	{
+		wireDraw = !wireDraw;
+	}
 #pragma endregion
 
 	deviceContext->ClearDepthStencilView(stencilView, D3D11_CLEAR_DEPTH, 1, 0);
@@ -777,10 +811,13 @@ bool WIN_APP::Run()
 	deviceContext->PSSetSamplers(0, 1, &teddySample);
 
 	deviceContext->RSSetState(wireState);
-
-	deviceContext->DrawIndexed(teddyVertCount, 0, 0);
+	if (wireDraw == true)
+	{
+		deviceContext->DrawIndexed(teddyVertCount, 0, 0);
+	}
 #pragma endregion
 
+#pragma region Joint and Skeleton Setup and Drawing
 	deviceContext->RSSetState(solidState);
 
 	for (size_t i = 0; i < teddyJoints.size(); i++)
@@ -789,36 +826,61 @@ bool WIN_APP::Run()
 		deviceContext->VSSetConstantBuffers(1, 1, &viewConstant);
 		deviceContext->IASetVertexBuffers(0, 1, &boneVertex, &stride, &offset);
 		deviceContext->IASetIndexBuffer(boneIndex, DXGI_FORMAT_R32_UINT, 0);
-
+	
 		deviceContext->IASetInputLayout(groundInputlayout);
 		deviceContext->VSSetShader(groundVertshader, NULL, 0);
 		deviceContext->PSSetShader(groundPixshader, NULL, 0);
 		deviceContext->PSSetShaderResources(0, 1, &boneshaderView);
 		deviceContext->PSSetSamplers(0, 1, &boneSample);
-
+	
 		deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
+	
 		deviceContext->DrawIndexed(boneVertcount, 0, 0);
 	}
 
-	float n[4] = { 1.0f, 1.0f, 0.0f, 1.0f };
-	for (int i = 0; i < teddyDebugPos.size(); i++)
-	{
-		if (i != teddyDebugPos.size() - 1)
-		{
-			add_debug_line(teddyDebugPos[i], teddyDebugPos[i + 1], n);
-		}
-	}
+	float n[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
 
-	//add_debug_line(teddyDebugPos[0], teddyDebugPos[1], n);
-	//add_debug_line(teddyDebugPos[0], teddyDebugPos[1], n);
-	//add_debug_line(teddyDebugPos[1], teddyDebugPos[2], n);
-	//add_debug_line(teddyDebugPos[1], teddyDebugPos[2], n);
+#pragma region Skeleton Setup
+	add_debug_line(vecArray[1], vecArray[2], n);
+	add_debug_line(vecArray[2], vecArray[3], n);
+	add_debug_line(vecArray[3], vecArray[4], n);
+	add_debug_line(vecArray[4], vecArray[5], n);
+	add_debug_line(vecArray[7], vecArray[8], n);
+	add_debug_line(vecArray[8], vecArray[9], n);
+	add_debug_line(vecArray[9], vecArray[10], n);
+	add_debug_line(vecArray[10], vecArray[11], n);
+	add_debug_line(vecArray[11], vecArray[12], n);
+	add_debug_line(vecArray[10], vecArray[13], n);
+	//add_debug_line(vecArray[7], vecArray[14], n);
+	add_debug_line(vecArray[3], vecArray[7], n);
+	add_debug_line(vecArray[3], vecArray[14], n);
+	add_debug_line(vecArray[14], vecArray[15], n);
+	add_debug_line(vecArray[15], vecArray[16], n);
+	add_debug_line(vecArray[16], vecArray[17], n);
+	add_debug_line(vecArray[17], vecArray[18], n);
+	add_debug_line(vecArray[18], vecArray[19], n);
+	add_debug_line(vecArray[17], vecArray[20], n);
+	add_debug_line(vecArray[22], vecArray[23], n);
+	add_debug_line(vecArray[23], vecArray[24], n);
+	add_debug_line(vecArray[24], vecArray[25], n);
+	add_debug_line(vecArray[25], vecArray[26], n);
+	add_debug_line(vecArray[27], vecArray[28], n);
+	add_debug_line(vecArray[28], vecArray[29], n);
+	add_debug_line(vecArray[29], vecArray[30], n);
+	add_debug_line(vecArray[32], vecArray[33], n);
+	add_debug_line(vecArray[33], vecArray[34], n);
+	add_debug_line(vecArray[34], vecArray[35], n);
+	add_debug_line(vecArray[1], vecArray[32], n);
+	add_debug_line(vecArray[1], vecArray[27], n);
+	//add_debug_line(vecArray[1], vecArray[26], n);
+	add_debug_line(vecArray[3], vecArray[22], n);
+#pragma endregion
+
 
 	deviceContext->Map(debugBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &debugMap);
-	memcpy_s(debugMap.pData, sizeof(debugVert) * count, &debugArray[0], sizeof(debugArray[0]));
+	memcpy_s(debugMap.pData, sizeof(debugVert) * 1024, &debugArray, sizeof(debugArray));
 	deviceContext->Unmap(debugBuffer, 0);
-	count = 0;
+	
 
 	deviceContext->IASetVertexBuffers(0, 1, &debugBuffer, &stride2, &offset);
 	deviceContext->IASetInputLayout(debugInputlayout);
@@ -826,8 +888,9 @@ bool WIN_APP::Run()
 	deviceContext->PSSetShader(debugPixshader, NULL, 0);
 	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
-	deviceContext->Draw(debugArray[0].size(), 0);
-	
+	deviceContext->Draw(count, 0);
+	count = 0;
+#pragma endregion
 	swapChain->Present(0, 0);
 
 	return true;
@@ -855,7 +918,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
 	FILE* new_std_in_out;
 	freopen_s(&new_std_in_out, "CONOUT$", "w", stdout);
 	freopen_s(&new_std_in_out, "CONIN$", "r", stdin);
-	std::cout << "Hello world!\n";
+	std::cout << "---Debug Window---\n";
 #endif
 
 
