@@ -14,11 +14,15 @@ using namespace DirectX;
 
 #include "GroundShader_VS.csh"
 #include "GroundShader_PS.csh"
+#include "DebugVS.csh"
+#include "DebugPS.csh"
 #include "DDSTextureLoader.h"
-#include "Facade.h"
+#include "Export.h"
+
 
 class WIN_APP
 {
+#pragma region Privates
 	HRESULT							hr;
 	HINSTANCE						application;
 	WNDPROC							appWndProc;
@@ -55,7 +59,9 @@ class WIN_APP
 
 	ID3D11RasterizerState* solidState;
 	ID3D11RasterizerState* wireState;
+#pragma endregion
 
+#pragma region Publics
 public:
 
 	struct GVERTEX
@@ -64,6 +70,12 @@ public:
 		XMVECTOR color;
 		XMFLOAT2 uv;
 		XMFLOAT3 normal;
+	};
+
+	struct debugVert
+	{
+		XMVECTOR pos;
+		float clr[4];
 	};
 
 	GVERTEX	groundPlane[4];
@@ -84,13 +96,54 @@ public:
 	ID3D11Buffer * viewConstant;
 	D3D11_BUFFER_DESC viewConstdesc;
 
+	ID3D11Buffer* teddyBuffer;
+	ID3D11Buffer* teddyIndex;
+	D3D11_BUFFER_DESC teddyVertBuffDesc;
+	D3D11_BUFFER_DESC teddyIndBuffDesc;
+	ID3D11ShaderResourceView *teddyshaderView;
+	ID3D11SamplerState *teddySample;
+	D3D11_SAMPLER_DESC teddysampleDesc;
+	int teddyVertCount;
+	vector<DllExport::JointMatrix> teddyJoints;
+
+	ID3D11Buffer* debugBuffer;
+	D3D11_BUFFER_DESC debugBuffDesc;
+	vector<debugVert> debugArray[1024];
+	ID3D11VertexShader *debugVertshader;
+	ID3D11PixelShader *debugPixshader; 
+	ID3D11InputLayout *debugInputlayout;
+	int count = 0;
 
 	POINT point;
+	vector<XMVECTOR> teddyDebugPos;
+#pragma endregion
 
 	WIN_APP(HINSTANCE hinst, WNDPROC proc);
+	void add_debug_line(XMVECTOR pointA, XMVECTOR pointB, float color[4]);
 	bool Run();
 	bool ShutDown();
 };
+
+void WIN_APP::add_debug_line(XMVECTOR pointA, XMVECTOR pointB, float color[4])
+{
+	debugVert tmp;
+	tmp.pos = pointA;
+	tmp.clr[0] = color[0];
+	tmp.clr[1] = color[1];
+	tmp.clr[2] = color[2];
+	tmp.clr[3] = color[3];
+	debugArray->push_back(tmp);
+
+	debugVert tmp2;
+	tmp2.pos = pointA;
+	tmp2.clr[0] = color[0];
+	tmp2.clr[1] = color[1];
+	tmp2.clr[2] = color[2];
+	tmp2.clr[3] = color[3]; 
+	debugArray->push_back(tmp2);
+
+	count += 2;
+}
 
 WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 {
@@ -281,6 +334,86 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma endregion
 
+#pragma region Teddy Initialization
+	vector<DllExport::PNUVertex> verts;
+	DllExport::Export test;
+
+	verts = test.LoadFBX(verts, "Teddy_Idle.fbx");
+	teddyVertCount = (int)verts.size();
+
+	teddyJoints = test.GetJoints(teddyJoints, "Teddy_Idle.fbx");
+
+	GVERTEX* teddyVerts = new GVERTEX[teddyVertCount];
+	unsigned int* teddyIndicies = new unsigned int[teddyVertCount];
+
+	DllExport::PNUVertex* teddyArray = &verts[0];
+	for (unsigned int i = 0; i < teddyVertCount; i++)
+	{
+		teddyVerts[i].pos = { teddyArray[i].mPosition.x, teddyArray[i].mPosition.y, teddyArray[i].mPosition.z, 0.0f };
+		teddyVerts[i].color = { 0, 0, 0, 0 };
+		teddyVerts[i].uv.x = teddyArray[i].mUV.x;
+		teddyVerts[i].uv.y = teddyArray[i].mUV.y;
+		teddyVerts[i].normal.x = teddyArray[i].mNormal.x;
+		teddyVerts[i].normal.y = teddyArray[i].mNormal.y;
+		teddyVerts[i].normal.z = teddyArray[i].mNormal.z;
+		teddyIndicies[i] = i;
+	}
+
+	teddyVertBuffDesc.Usage = D3D11_USAGE_IMMUTABLE;
+	teddyVertBuffDesc.ByteWidth = sizeof(GVERTEX)*teddyVertCount;
+	teddyVertBuffDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	teddyVertBuffDesc.CPUAccessFlags = 0;
+	teddyVertBuffDesc.MiscFlags = 0;
+	teddyVertBuffDesc.StructureByteStride = 0;
+
+	InitData.pSysMem = teddyVerts;
+	device->CreateBuffer(&teddyVertBuffDesc, &InitData, &teddyBuffer);
+
+	teddyIndBuffDesc.Usage = D3D11_USAGE_IMMUTABLE;
+	teddyIndBuffDesc.ByteWidth = sizeof(unsigned long)*teddyVertCount;
+	teddyIndBuffDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	teddyIndBuffDesc.CPUAccessFlags = 0;
+	teddyIndBuffDesc.MiscFlags = 0;
+	teddyIndBuffDesc.StructureByteStride = 0;
+
+	InitData.pSysMem = teddyIndicies;
+	device->CreateBuffer(&teddyIndBuffDesc, &InitData, &teddyIndex);
+
+	teddysampleDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	teddysampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	teddysampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	teddysampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	teddysampleDesc.MinLOD = (-FLT_MAX);
+	teddysampleDesc.MaxLOD = (FLT_MAX);
+	teddysampleDesc.MipLODBias = 0.0f;
+	teddysampleDesc.MaxAnisotropy = 1;
+	teddysampleDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	teddysampleDesc.BorderColor[0] = 1;
+	teddysampleDesc.BorderColor[1] = 1;
+	teddysampleDesc.BorderColor[2] = 1;
+	teddysampleDesc.BorderColor[3] = 1;
+
+	delete[] teddyVerts;
+	delete[] teddyIndicies;
+#pragma endregion
+
+#pragma region Debug Renderer Buffers
+	debugBuffDesc.Usage = D3D11_USAGE_DYNAMIC;
+	debugBuffDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	debugBuffDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	debugBuffDesc.ByteWidth = sizeof(debugVert) * 37;
+	debugBuffDesc.MiscFlags = 0;
+	debugBuffDesc.StructureByteStride = 0;
+
+	//D3D11_SUBRESOURCE_DATA InitData;
+	//InitData.pSysMem = groundPlane;
+	//InitData.SysMemPitch = 0;
+	//InitData.SysMemSlicePitch = 0;
+
+	InitData.pSysMem = &debugArray[0];
+	device->CreateBuffer(&debugBuffDesc, &InitData, &debugBuffer);
+#pragma endregion
+
 #pragma region Depth Stencil Initialization
 	depthDesc.Width = 1280;
 	depthDesc.Height = 720;
@@ -338,11 +471,14 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma region DDS Texture Creation
 	CreateDDSTextureFromFile(device, L"stone_0001_c.dds", nullptr, &groundshaderView, 0);
+	CreateDDSTextureFromFile(device, L"Teddy_Idle.dds", nullptr, &teddyshaderView, 0);
 #pragma endregion
 
 #pragma region Shader Initialization
 	device->CreateVertexShader(GroundShader_VS, sizeof(GroundShader_VS), nullptr, &groundVertshader);
 	device->CreatePixelShader(GroundShader_PS, sizeof(GroundShader_PS), nullptr, &groundPixshader);
+	device->CreateVertexShader(DebugVS, sizeof(DebugVS), nullptr, &debugVertshader);
+	device->CreatePixelShader(DebugPS, sizeof(DebugPS), nullptr, &debugPixshader);
 
 	D3D11_INPUT_ELEMENT_DESC groundLayout[] =
 	{
@@ -351,9 +487,16 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 		{ "UV", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 	};
+	D3D11_INPUT_ELEMENT_DESC debugLayout[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	};
 
 	device->CreateSamplerState(&groundsampleDesc, &groundSample);
+	device->CreateSamplerState(&teddysampleDesc, &teddySample);
 	device->CreateInputLayout(groundLayout, ARRAYSIZE(groundLayout), GroundShader_VS, sizeof(GroundShader_VS), &groundInputlayout);
+	device->CreateInputLayout(debugLayout, ARRAYSIZE(debugLayout), DebugVS, sizeof(DebugVS), &debugInputlayout);
 #pragma endregion
 
 #pragma region Matrix Setup
@@ -364,6 +507,16 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(65.0f), (1280.0f / 720.0f), 0.1f, 1000.0f);
 	view.ProjectionMatrix = projection;
 #pragma endregion
+
+	for (int i = 0; i < teddyJoints.size(); i++)
+	{
+		XMVECTOR vec;
+		vec.m128_f32[0] = teddyJoints[i].global_xform[12];
+		vec.m128_f32[1] = teddyJoints[i].global_xform[13];
+		vec.m128_f32[2] = teddyJoints[i].global_xform[14];
+		vec.m128_f32[3] = teddyJoints[i].global_xform[15];
+		teddyDebugPos.push_back(vec);
+	}
 
 }
 
@@ -442,7 +595,9 @@ bool WIN_APP::Run()
 #pragma region Mapping
 	D3D11_MAPPED_SUBRESOURCE viewMap;
 	D3D11_MAPPED_SUBRESOURCE groundMap;
+	D3D11_MAPPED_SUBRESOURCE debugMap;
 	UINT stride = sizeof(GVERTEX);
+	UINT stride2 = sizeof(debugVert);
 	UINT offset = 0;
 
 	deviceContext->Map(viewConstant, 0, D3D11_MAP_WRITE_DISCARD, NULL, &viewMap);
@@ -489,6 +644,43 @@ bool WIN_APP::Run()
 	deviceContext->DrawIndexed(12, 0, 0);
 #pragma endregion
 
+#pragma region Teddy Setup and Drawing
+	deviceContext->IASetVertexBuffers(0, 1, &teddyBuffer, &stride, &offset);
+	deviceContext->IASetIndexBuffer(teddyIndex, DXGI_FORMAT_R32_UINT, 0);
+	deviceContext->PSSetShaderResources(0, 1, &teddyshaderView);
+	deviceContext->PSSetSamplers(0, 1, &teddySample);
+
+	deviceContext->RSSetState(wireState);
+
+	deviceContext->DrawIndexed(teddyVertCount, 0, 0);
+#pragma endregion
+
+
+	float n[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+	//for (int i = 0; i < teddyDebugPos.size(); i++)
+	//{
+	//	if (i != teddyDebugPos.size() - 1)
+	//	{
+	//		add_debug_line(teddyDebugPos[i], teddyDebugPos[i + 1], n);
+	//	}
+	//}
+
+	add_debug_line(teddyDebugPos[0], teddyDebugPos[1], n);
+	add_debug_line(teddyDebugPos[1], teddyDebugPos[2], n);
+
+	deviceContext->Map(debugBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &debugMap);
+	memcpy_s(debugMap.pData, sizeof(debugVert) * count, &debugArray[0], sizeof(debugArray[0]));
+	deviceContext->Unmap(debugBuffer, 0);
+	count = 0;
+
+	deviceContext->IASetVertexBuffers(0, 1, &debugBuffer, &stride2, &offset);
+	deviceContext->IASetInputLayout(groundInputlayout);
+	deviceContext->VSSetShader(groundVertshader, NULL, 0);
+	deviceContext->PSSetShader(groundPixshader, NULL, 0);
+	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+
+	deviceContext->Draw(debugArray[0].size(), 0);
+	
 	swapChain->Present(0, 0);
 
 	return true;
@@ -496,7 +688,10 @@ bool WIN_APP::Run()
 
 bool WIN_APP::ShutDown()
 {
-	
+#ifndef NDEBUG
+	FreeConsole();
+#endif
+
 	UnregisterClass(L"RTA Project", application);
 	return true;
 }
@@ -507,6 +702,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPTSTR, int)
 {
 	srand(unsigned int(time(0)));
 	WIN_APP myApp(hInstance, (WNDPROC)WndProc);
+
+#ifndef NDEBUG
+	AllocConsole();
+	FILE* new_std_in_out;
+	freopen_s(&new_std_in_out, "CONOUT$", "w", stdout);
+	freopen_s(&new_std_in_out, "CONIN$", "r", stdin);
+	std::cout << "Hello world!\n";
+#endif
+
+
 	MSG msg; ZeroMemory(&msg, sizeof(msg));
 	while (msg.message != WM_QUIT && myApp.Run())
 	{

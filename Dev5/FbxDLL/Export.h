@@ -15,10 +15,91 @@
 using namespace DirectX;
 using namespace std;
 
-class DLLEXPORT Export
+namespace DllExport
 {
-public:
-	Export();
-	~Export();
-};
+	struct PNUVertex
+	{
+		XMFLOAT3 mPosition;
+		XMFLOAT3 mNormal;
+		XMFLOAT2 mUV;
+	};
+
+	struct Joint
+	{
+		FbxNode* mNode;
+		string mName;
+		FbxAMatrix mGlobalBindposeInverse;
+		int mParentIndex;
+	};
+
+	struct Skeleton
+	{
+		vector<Joint> mJoints;
+	};
+
+	struct CtrlPoint
+	{
+		XMFLOAT3 mPosition;
+		//vector<BlendingIndexWeightPair> mBlendingInfo;
+
+		//CtrlPoint()
+		//{
+		//	mBlendingInfo.reserve(4);
+		//}
+	};
+
+	struct Triangle
+	{
+		vector<unsigned int> mIndices;
+		string mMaterialName;
+		unsigned int mMaterialIndex;
+
+		bool operator<(const Triangle& rhs)
+		{
+			return mMaterialIndex < rhs.mMaterialIndex;
+		}
+	};
+
+	struct JointMatrix
+	{
+		float global_xform[16];
+		int mParentIndex;
+	};
+
+	class DLLEXPORT Export
+	{
+	public:
+		Export();
+		bool Initialize();
+		bool LoadScene(const char* inFileName);
+		FbxScene* getScene() { return mScene; }
+		vector<PNUVertex> getVertices() { return mVerts; }
+		void ProcessSkeletonHierarchy(FbxNode* inRootNode);
+		void ProcessSkeletonHierarchyRecursively(FbxNode* inNode, int inDepth, int myIndex, int inParentIndex);
+		void ProcessControlPoints(FbxNode* inNode);
+		void ProcessMesh(FbxNode* inNode);
+		FbxAMatrix Export::GetGeometryTransforms(FbxNode * inNode);
+		unsigned int Export::FindJointIndexUsingName(const string & inJointName);
+		void Export::ProcessJoints(FbxNode * inNode);
+		std::vector<PNUVertex> LoadFBX(std::vector<PNUVertex> outVerts, const char* file);
+		std::vector<JointMatrix> GetJoints(std::vector<JointMatrix> outJoints, const char* file);
+		void ReadUV(FbxMesh* inMesh, int inCtrlPointIndex, int inTextureUVIndex, int inUVLayer, XMFLOAT2& outUV);
+		void ReadNormal(FbxMesh* inMesh, int inCtrlPointIndex, int inVertexCounter, XMFLOAT3& outNormal);
+		void ReadBinormal(FbxMesh* inMesh, int inCtrlPointIndex, int inVertexCounter, XMFLOAT3& outBinormal);
+		void ReadTangent(FbxMesh* inMesh, int inCtrlPointIndex, int inVertexCounter, XMFLOAT3& outTangent);
+		Skeleton getSkelton() { return mSkeleton; }
+
+	private:
+		FbxManager* mFBXMan;
+		FbxScene* mScene;
+		Skeleton mSkeleton;
+		unsigned int mTriCount;
+		vector<Triangle> mTris;
+		vector<PNUVertex> mVerts;
+		unordered_map<unsigned int, CtrlPoint*> mControlPoints;
+		vector<XMFLOAT3> m_ControlVectors;
+		string inputFilePath;
+		string outputFilePath;
+	};
+}
 

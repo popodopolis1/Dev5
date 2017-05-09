@@ -34,5 +34,11 @@
     <FxCompile Include="GroundShader_PS.hlsl">
       <Filter>Resource Files</Filter>
     </FxCompile>
+    <FxCompile Include="DebugVS.hlsl">
+      <Filter>Resource Files</Filter>
+    </FxCompile>
+    <FxCompile Include="DebugPS.hlsl">
+      <Filter>Resource Files</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
