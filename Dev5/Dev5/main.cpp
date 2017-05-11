@@ -79,6 +79,12 @@ public:
 		float clr[4];
 	};
 
+	struct debugDrawVert
+	{
+		XMVECTOR pos;
+		int pIndex;
+	};
+
 	GVERTEX	groundPlane[4];
 
 	ID3D11Buffer *groundBuffer;
@@ -106,6 +112,7 @@ public:
 	D3D11_SAMPLER_DESC teddysampleDesc;
 	int teddyVertCount;
 	vector<DllExport::JointMatrix> teddyJoints;
+	vector<vector<DllExport::JointMatrix>> teddyFrames;
 
 	ID3D11Buffer* debugBuffer;
 	D3D11_BUFFER_DESC debugBuffDesc;
@@ -127,7 +134,7 @@ public:
 	vector<ID3D11Buffer*> boneConstant;
 	D3D11_BUFFER_DESC boneConstantdesc;
 
-	XMVECTOR vecArray[37];
+	debugDrawVert vecArray[37];
 
 	bool wireDraw = false;
 
@@ -371,6 +378,8 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 		XMMATRIX temp = floatArrayToMatrix(teddyJoints[i].global_xform);
 		jointMats.push_back(temp);
 	}
+
+	//teddyFrames = test.GetKeyframes(teddyFrames, "Teddy_Idle.fbx");
 
 	GVERTEX* teddyVerts = new GVERTEX[teddyVertCount];
 	unsigned int* teddyIndicies = new unsigned int[teddyVertCount];
@@ -652,17 +661,7 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 		debugArray[i] = tmp;
 	}
 
-	for (int i = 0; i < teddyJoints.size(); i++)
-	{
-
-			XMVECTOR vec;
-			vec.m128_f32[0] = teddyJoints[i].global_xform[12];
-			vec.m128_f32[1] = teddyJoints[i].global_xform[13];
-			vec.m128_f32[2] = teddyJoints[i].global_xform[14];
-			vec.m128_f32[3] = 1.0f;
-
-			vecArray[i] = vec;
-	}
+	
 #pragma endregion
 
 }
@@ -840,40 +839,66 @@ bool WIN_APP::Run()
 
 	float n[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
 
+	for (int i = 0; i < teddyJoints.size(); i++)
+	{
+
+		debugDrawVert vec;
+		vec.pos.m128_f32[0] = teddyJoints[i].global_xform[12];
+		vec.pos.m128_f32[1] = teddyJoints[i].global_xform[13];
+		vec.pos.m128_f32[2] = teddyJoints[i].global_xform[14];
+		vec.pos.m128_f32[3] = 1.0f;
+
+		vec.pIndex = teddyJoints[i].mParentIndex;
+
+		vecArray[i] = vec;
+	}
+
+
+	for (int i = 0; i < 37; i++)
+	{
+		for (int x = 0; x < 37; x++)
+		{
+			if (i == vecArray[x].pIndex && i != x)
+			{
+				add_debug_line(vecArray[i].pos, vecArray[x].pos, n);
+			}
+		}
+	}
+
 #pragma region Skeleton Setup
-	add_debug_line(vecArray[1], vecArray[2], n);
-	add_debug_line(vecArray[2], vecArray[3], n);
-	add_debug_line(vecArray[3], vecArray[4], n);
-	add_debug_line(vecArray[4], vecArray[5], n);
-	add_debug_line(vecArray[7], vecArray[8], n);
-	add_debug_line(vecArray[8], vecArray[9], n);
-	add_debug_line(vecArray[9], vecArray[10], n);
-	add_debug_line(vecArray[10], vecArray[11], n);
-	add_debug_line(vecArray[11], vecArray[12], n);
-	add_debug_line(vecArray[10], vecArray[13], n);
-	//add_debug_line(vecArray[7], vecArray[14], n);
-	add_debug_line(vecArray[3], vecArray[7], n);
-	add_debug_line(vecArray[3], vecArray[14], n);
-	add_debug_line(vecArray[14], vecArray[15], n);
-	add_debug_line(vecArray[15], vecArray[16], n);
-	add_debug_line(vecArray[16], vecArray[17], n);
-	add_debug_line(vecArray[17], vecArray[18], n);
-	add_debug_line(vecArray[18], vecArray[19], n);
-	add_debug_line(vecArray[17], vecArray[20], n);
-	add_debug_line(vecArray[22], vecArray[23], n);
-	add_debug_line(vecArray[23], vecArray[24], n);
-	add_debug_line(vecArray[24], vecArray[25], n);
-	add_debug_line(vecArray[25], vecArray[26], n);
-	add_debug_line(vecArray[27], vecArray[28], n);
-	add_debug_line(vecArray[28], vecArray[29], n);
-	add_debug_line(vecArray[29], vecArray[30], n);
-	add_debug_line(vecArray[32], vecArray[33], n);
-	add_debug_line(vecArray[33], vecArray[34], n);
-	add_debug_line(vecArray[34], vecArray[35], n);
-	add_debug_line(vecArray[1], vecArray[32], n);
-	add_debug_line(vecArray[1], vecArray[27], n);
-	//add_debug_line(vecArray[1], vecArray[26], n);
-	add_debug_line(vecArray[3], vecArray[22], n);
+	//add_debug_line(vecArray[1], vecArray[2], n);
+	//add_debug_line(vecArray[2], vecArray[3], n);
+	//add_debug_line(vecArray[3], vecArray[4], n);
+	//add_debug_line(vecArray[4], vecArray[5], n);
+	//add_debug_line(vecArray[7], vecArray[8], n);
+	//add_debug_line(vecArray[8], vecArray[9], n);
+	//add_debug_line(vecArray[9], vecArray[10], n);
+	//add_debug_line(vecArray[10], vecArray[11], n);
+	//add_debug_line(vecArray[11], vecArray[12], n);
+	//add_debug_line(vecArray[10], vecArray[13], n);
+	////add_debug_line(vecArray[7], vecArray[14], n);
+	//add_debug_line(vecArray[3], vecArray[7], n);
+	//add_debug_line(vecArray[3], vecArray[14], n);
+	//add_debug_line(vecArray[14], vecArray[15], n);
+	//add_debug_line(vecArray[15], vecArray[16], n);
+	//add_debug_line(vecArray[16], vecArray[17], n);
+	//add_debug_line(vecArray[17], vecArray[18], n);
+	//add_debug_line(vecArray[18], vecArray[19], n);
+	//add_debug_line(vecArray[17], vecArray[20], n);
+	//add_debug_line(vecArray[22], vecArray[23], n);
+	//add_debug_line(vecArray[23], vecArray[24], n);
+	//add_debug_line(vecArray[24], vecArray[25], n);
+	//add_debug_line(vecArray[25], vecArray[26], n);
+	//add_debug_line(vecArray[27], vecArray[28], n);
+	//add_debug_line(vecArray[28], vecArray[29], n);
+	//add_debug_line(vecArray[29], vecArray[30], n);
+	//add_debug_line(vecArray[32], vecArray[33], n);
+	//add_debug_line(vecArray[33], vecArray[34], n);
+	//add_debug_line(vecArray[34], vecArray[35], n);
+	//add_debug_line(vecArray[1], vecArray[32], n);
+	//add_debug_line(vecArray[1], vecArray[27], n);
+	////add_debug_line(vecArray[1], vecArray[26], n);
+	//add_debug_line(vecArray[3], vecArray[22], n);
 #pragma endregion
 
 

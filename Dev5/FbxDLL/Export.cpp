@@ -180,38 +180,74 @@ namespace DllExport
 
 	void Export::ProcessJoints(FbxNode * inNode)
 	{
-		FbxMesh* mesh = inNode->GetMesh();
-		if (mesh == nullptr)
-		{
-			mesh = inNode->GetChild(0)->GetMesh();
-		}
-		unsigned int numOfDeformers = mesh->GetDeformerCount();
+		//FbxMesh* mesh = inNode->GetMesh();
+		//if (mesh == nullptr)
+		//{
+		//	mesh = inNode->GetChild(0)->GetMesh();
+		//}
+		//unsigned int numOfDeformers = mesh->GetDeformerCount();
+		//FbxAMatrix geometryTransform = GetGeometryTransforms(inNode);
+		//
+		//for (unsigned int i = 0; i < numOfDeformers; ++i)
+		//{
+		//	FbxSkin* skin = reinterpret_cast<FbxSkin*>(mesh->GetDeformer(i, FbxDeformer::eSkin));
+		//	if (!skin)
+		//	{
+		//		continue;
+		//	}
+		//	unsigned int numOfClusters = skin->GetClusterCount();
+		//	for (unsigned int x = 0; x < numOfClusters; ++x)
+		//	{
+		//		FbxCluster* cluster = skin->GetCluster(x);
+		//		string jointName = cluster->GetLink()->GetName();
+		//		unsigned int jointIndex = FindJointIndexUsingName(jointName);
+		//
+		//		FbxAMatrix transformMatrix;
+		//		FbxAMatrix transformLinkMatrix;
+		//		FbxAMatrix globalBindPoseInverseMatrix;
+		//		cluster->GetTransformMatrix(transformMatrix);
+		//		cluster->GetTransformLinkMatrix(transformLinkMatrix);
+		//		globalBindPoseInverseMatrix = transformLinkMatrix.Inverse() * transformMatrix * geometryTransform;
+		//
+		//		mSkeleton.mJoints[jointIndex].mGlobalBindposeInverse = globalBindPoseInverseMatrix;
+		//		mSkeleton.mJoints[jointIndex].mNode = cluster->GetLink();
+		//	}
+		//}
+	}
+
+	void Export::ProcessAnimations(FbxNode * inNode)
+	{
 		FbxAMatrix geometryTransform = GetGeometryTransforms(inNode);
 
-		for (unsigned int i = 0; i < numOfDeformers; ++i)
+		FbxAnimStack* animStack = mScene->GetSrcObject<FbxAnimStack>(0);
+		FbxString stackName = animStack->GetName();
+		//mAnimationName = stackName.Buffer();
+		FbxTakeInfo* info = mScene->GetTakeInfo(stackName);
+		FbxTime start = info->mLocalTimeSpan.GetStart();
+		FbxTime end = info->mLocalTimeSpan.GetStop();
+		//mAnimationLength = end.GetFrameCount(FbxTime::eFrames24) - start.GetFrameCount(FbxTime::eFrames24) + 1;
+
+		//animation.name = mAnimationName;
+		animation.duration = end.GetFrameCount(FbxTime::eFrames24) - start.GetFrameCount(FbxTime::eFrames24) + 1;;
+		//animation.numFrame = (float)end.GetFrameCount(FbxTime::eFrames24);
+
+		for (FbxLongLong z = start.GetFrameCount(FbxTime::eFrames24); z <= end.GetFrameCount(FbxTime::eFrames24); ++z)
 		{
-			FbxSkin* skin = reinterpret_cast<FbxSkin*>(mesh->GetDeformer(i, FbxDeformer::eSkin));
-			if (!skin)
+			FbxTime time;
+			time.SetFrame(z, FbxTime::eFrames24);
+			Keyframe* frame = new Keyframe();
+			frame->joints.resize(mSkeleton.mJoints.size());
+			frame->time = z;
+			for (int j = 0; j < mSkeleton.mJoints.size(); j++)
 			{
-				continue;
+				//
+				if (j != 6 && j != 21 && j != 31 && j != 36)
+				{
+					//FbxAMatrix transformOffset = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(time) * geometryTransform;
+					frame->joints[j] = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(time);
+				}
 			}
-			unsigned int numOfClusters = skin->GetClusterCount();
-			for (unsigned int x = 0; x < numOfClusters; ++x)
-			{
-				FbxCluster* cluster = skin->GetCluster(x);
-				string jointName = cluster->GetLink()->GetName();
-				unsigned int jointIndex = FindJointIndexUsingName(jointName);
-
-				FbxAMatrix transformMatrix;
-				FbxAMatrix transformLinkMatrix;
-				FbxAMatrix globalBindPoseInverseMatrix;
-				cluster->GetTransformMatrix(transformMatrix);
-				cluster->GetTransformLinkMatrix(transformLinkMatrix);
-				globalBindPoseInverseMatrix = transformLinkMatrix.Inverse() * transformMatrix * geometryTransform;
-
-				mSkeleton.mJoints[jointIndex].mGlobalBindposeInverse = globalBindPoseInverseMatrix;
-				mSkeleton.mJoints[jointIndex].mNode = cluster->GetLink();
-			}
+			animation.frames.push_back(frame);
 		}
 	}
 
@@ -256,11 +292,64 @@ namespace DllExport
 		exporter->ProcessControlPoints(node);
 		exporter->ProcessMesh(scene->GetRootNode());
 		exporter->ProcessSkeletonHierarchy(node);
-		exporter->ProcessJoints(node);
+		//exporter->ProcessJoints(node);
 
-		for (int i = 0; i < exporter->getSkelton().mJoints.size(); i++)
+
+
+		FbxPose* pose;
+		
+		for (int i = 0; i < scene->GetPoseCount(); i++)
 		{
-			FbxAMatrix a = exporter->getSkelton().mJoints[i].mGlobalBindposeInverse.Inverse();
+			pose = scene->GetPose(i);
+			if (pose->IsBindPose())
+			{
+				break;
+			}
+		}
+
+		int c = pose->GetCount();
+
+		FbxSkeleton* skel;
+		for (int i = 0; i < pose->GetCount(); i++)
+		{
+			FbxNode* fbxnode = pose->GetNode(i);
+			skel = fbxnode->GetSkeleton();
+			if (skel != nullptr)
+			{
+				if (skel->IsSkeletonRoot())
+				{
+					break;
+				}
+			}
+		}
+
+		Joint jnt;
+		jnt.mNode = skel->GetNode(0);
+		jnt.mParentIndex = -1;
+		mSkeleton.mJoints.push_back(jnt);
+
+		for (int i = 0; i < mSkeleton.mJoints.size(); i++)
+		{
+			FbxNode* fbxnode = mSkeleton.mJoints[i].mNode;
+			
+			int c = fbxnode->GetChildCount();
+			if (c != 0)
+			{
+				for (int x = 0; x < c; x++)
+				{
+					Joint j;
+					FbxNode* childnode = fbxnode->GetChild(x);
+					j.mNode = childnode;
+					j.mParentIndex = i;
+					mSkeleton.mJoints.push_back(j);
+				}
+			}
+		}
+
+
+		for (int i = 0; i < mSkeleton.mJoints.size(); i++)
+		{
+			FbxAMatrix a = mSkeleton.mJoints[i].mNode->EvaluateGlobalTransform();
 			FbxVector4 b = a.GetRow(0);
 			FbxVector4 c = a.GetRow(1);
 			FbxVector4 d = a.GetRow(2);
@@ -282,10 +371,61 @@ namespace DllExport
 			{
 				vert.global_xform[v + 12] = (float)e.mData[v];
 			}
+			vert.mParentIndex = mSkeleton.mJoints[i].mParentIndex;
 			outJoints.push_back(vert);
 		}
-
+		
 		return outJoints;
+	}
+
+	std::vector<vector<JointMatrix>> Export::GetKeyframes(std::vector<vector<JointMatrix>> outFrames, const char * file)
+	{
+		Export* exporter = new Export();
+		exporter->Initialize();
+		exporter->LoadScene(file);
+		FbxScene* scene = exporter->getScene();
+		FbxNode* node = scene->GetRootNode();
+		int track = scene->GetNodeCount();
+		exporter->ProcessControlPoints(node);
+		exporter->ProcessMesh(scene->GetRootNode());
+		exporter->ProcessSkeletonHierarchy(node);
+		exporter->ProcessJoints(node);
+		exporter->ProcessAnimations(node);
+
+		vector<JointMatrix> JFrames;
+
+		for (int i = 0; i < animation.frames.size(); i++)
+		{
+			for (int i = 0; i < animation.frames[i]->joints.size(); i++)
+			{
+				FbxAMatrix a = animation.frames[i]->joints[i];
+				FbxVector4 b = a.GetRow(0);
+				FbxVector4 c = a.GetRow(1);
+				FbxVector4 d = a.GetRow(2);
+				FbxVector4 e = a.GetRow(3);
+
+				JointMatrix vert;
+				for (int v = 0; v < 4; v++)
+				{
+					vert.global_xform[v] = b.mData[v];
+				}
+				for (int v = 0; v < 4; v++)
+				{
+					vert.global_xform[v + 4] = c.mData[v];
+				}
+				for (int v = 0; v < 4; v++)
+				{
+					vert.global_xform[v + 8] = d.mData[v];
+				}
+				for (int v = 0; v < 4; v++)
+				{
+					vert.global_xform[v + 12] = e.mData[v];
+				}
+				JFrames.push_back(vert);
+			}
+			outFrames.push_back(JFrames);
+		}
+		return outFrames;
 	}
 
 	void Export::ReadUV(FbxMesh * inMesh, int inCtrlPointIndex, int inTextureUVIndex, int inUVLayer, XMFLOAT2 & outUV)
