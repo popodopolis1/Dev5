@@ -217,6 +217,7 @@ namespace DllExport
 
 	void Export::ProcessAnimations(FbxNode * inNode)
 	{
+		#pragma region Old Code
 		FbxAMatrix geometryTransform = GetGeometryTransforms(inNode);
 
 		FbxAnimStack* animStack = mScene->GetSrcObject<FbxAnimStack>(0);
@@ -249,6 +250,7 @@ namespace DllExport
 			}
 			animation.frames.push_back(frame);
 		}
+		#pragma endregion
 	}
 
 	std::vector<PNUVertex> Export::LoadFBX(std::vector<PNUVertex> outVerts, const char * file)
@@ -385,18 +387,39 @@ namespace DllExport
 		exporter->LoadScene(file);
 		FbxScene* scene = exporter->getScene();
 		FbxNode* node = scene->GetRootNode();
-		int track = scene->GetNodeCount();
+		//int track = scene->GetNodeCount();
 		exporter->ProcessControlPoints(node);
 		exporter->ProcessMesh(scene->GetRootNode());
 		exporter->ProcessSkeletonHierarchy(node);
-		exporter->ProcessJoints(node);
-		exporter->ProcessAnimations(node);
+		//exporter->ProcessJoints(node);
+		//exporter->ProcessAnimations(node);
+
+		
+		FbxAnimStack* stack = scene->GetCurrentAnimationStack();
+		FbxTimeSpan span = stack->GetLocalTimeSpan();
+		FbxTime time = span.GetDuration();
+		FbxLongLong numFrames = time.GetFrameCount(FbxTime::eFrames24);
+
+		
+		for (FbxLongLong z = 1; z <= numFrames; ++z)
+		{
+			FbxTime time;
+			time.SetFrame(z, FbxTime::eFrames24);
+			Keyframe* frame = new Keyframe();
+			frame->joints.resize(mSkeleton.mJoints.size());
+			frame->time = z;
+			for (int j = 0; j < mSkeleton.mJoints.size(); j++)
+			{
+				frame->joints[j] = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(time);
+			}
+			animation.frames.push_back(frame);
+		}
 
 		vector<JointMatrix> JFrames;
 
 		for (int i = 0; i < animation.frames.size(); i++)
 		{
-			for (int i = 0; i < animation.frames[i]->joints.size(); i++)
+			for (int i = 0; i < 37; i++)
 			{
 				FbxAMatrix a = animation.frames[i]->joints[i];
 				FbxVector4 b = a.GetRow(0);
@@ -421,9 +444,11 @@ namespace DllExport
 				{
 					vert.global_xform[v + 12] = e.mData[v];
 				}
+				vert.mParentIndex = mSkeleton.mJoints[i].mParentIndex;
 				JFrames.push_back(vert);
 			}
 			outFrames.push_back(JFrames);
+			JFrames.clear();
 		}
 		return outFrames;
 	}

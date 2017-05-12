@@ -60,6 +60,7 @@ class WIN_APP
 	ID3D11RasterizerState* wireState;
 	vector<World> boneWorld;
 	vector<XMMATRIX> jointMats;
+	vector<vector<XMMATRIX>> frameMats;
 #pragma endregion
 
 #pragma region Publics
@@ -379,7 +380,16 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 		jointMats.push_back(temp);
 	}
 
-	//teddyFrames = test.GetKeyframes(teddyFrames, "Teddy_Idle.fbx");
+	teddyFrames = test.GetKeyframes(teddyFrames, "Teddy_Idle.fbx");
+	frameMats.resize(teddyFrames.size());
+	for (int i = 0; i < teddyFrames.size(); i++)
+	{
+		for (int x = 0; x < teddyFrames[i].size(); x++)
+		{
+			XMMATRIX temp = floatArrayToMatrix(teddyFrames[i][x].global_xform);
+			frameMats[i].push_back(temp);
+		}
+	}
 
 	GVERTEX* teddyVerts = new GVERTEX[teddyVertCount];
 	unsigned int* teddyIndicies = new unsigned int[teddyVertCount];
