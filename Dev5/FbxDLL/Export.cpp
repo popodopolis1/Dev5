@@ -403,14 +403,14 @@ namespace DllExport
 		
 		for (FbxLongLong z = 1; z <= numFrames; ++z)
 		{
-			FbxTime time;
-			time.SetFrame(z, FbxTime::eFrames24);
 			Keyframe* frame = new Keyframe();
+			FbxTime currtime;
+			currtime.SetFrame(z, FbxTime::eFrames24);
 			frame->joints.resize(mSkeleton.mJoints.size());
-			frame->time = z;
+			frame->time = currtime.Get();
 			for (int j = 0; j < mSkeleton.mJoints.size(); j++)
 			{
-				frame->joints[j] = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(time);
+				frame->joints[j] = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(currtime);
 			}
 			animation.frames.push_back(frame);
 		}
@@ -419,9 +419,9 @@ namespace DllExport
 
 		for (int i = 0; i < animation.frames.size(); i++)
 		{
-			for (int i = 0; i < 37; i++)
+			for (int x = 0; x < 37; x++)
 			{
-				FbxAMatrix a = animation.frames[i]->joints[i];
+				FbxAMatrix a = animation.frames[i]->joints[x];
 				FbxVector4 b = a.GetRow(0);
 				FbxVector4 c = a.GetRow(1);
 				FbxVector4 d = a.GetRow(2);
@@ -444,7 +444,7 @@ namespace DllExport
 				{
 					vert.global_xform[v + 12] = e.mData[v];
 				}
-				vert.mParentIndex = mSkeleton.mJoints[i].mParentIndex;
+				vert.mParentIndex = mSkeleton.mJoints[x].mParentIndex;
 				JFrames.push_back(vert);
 			}
 			outFrames.push_back(JFrames);

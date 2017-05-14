@@ -138,7 +138,9 @@ public:
 	debugDrawVert vecArray[37];
 
 	bool wireDraw = false;
-
+	unsigned int animCount = 0;
+	unsigned int ind = 0;
+	bool animOn = false;
 #pragma endregion
 
 	WIN_APP(HINSTANCE hinst, WNDPROC proc);
@@ -682,7 +684,7 @@ bool WIN_APP::Run()
 	view.ViewMatrix = XMMatrixInverse(0, view.ViewMatrix);
 #pragma endregion
 
-#pragma region Camera Controls
+#pragma region Camera and Animation Controls
 	if (GetAsyncKeyState(VK_SPACE))
 	{
 		XMMATRIX straight = XMMatrixTranslation(0, 0.05f * 2, 0);
@@ -715,6 +717,27 @@ bool WIN_APP::Run()
 		XMMATRIX backward = XMMatrixTranslation(0, 0, -0.05f * 2);
 		view.ViewMatrix = XMMatrixMultiply(backward, view.ViewMatrix);
 	}
+
+	ind = animCount;
+
+	if (GetAsyncKeyState('N') & 0x01)
+	{
+		animOn = true;
+		if (animCount == teddyFrames.size())
+		{
+			animCount = 0;
+		}
+
+		for (unsigned int i = 0; i < teddyFrames[animCount].size(); i++)
+		{
+			XMMATRIX boneJoint;
+			boneJoint = frameMats[animCount][i];
+			boneWorld[i].WorldMatrix = boneJoint;
+		}
+
+		animCount++;
+	}
+
 
 	POINT newPos;
 	GetCursorPos(&newPos);
@@ -848,19 +871,41 @@ bool WIN_APP::Run()
 	}
 
 	float n[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-
-	for (int i = 0; i < teddyJoints.size(); i++)
+	if (animOn == false)
 	{
+		for (int i = 0; i < teddyJoints.size(); i++)
+		{
 
-		debugDrawVert vec;
-		vec.pos.m128_f32[0] = teddyJoints[i].global_xform[12];
-		vec.pos.m128_f32[1] = teddyJoints[i].global_xform[13];
-		vec.pos.m128_f32[2] = teddyJoints[i].global_xform[14];
-		vec.pos.m128_f32[3] = 1.0f;
+			debugDrawVert vec;
+			vec.pos.m128_f32[0] = teddyJoints[i].global_xform[12];
+			vec.pos.m128_f32[1] = teddyJoints[i].global_xform[13];
+			vec.pos.m128_f32[2] = teddyJoints[i].global_xform[14];
+			vec.pos.m128_f32[3] = 1.0f;
 
-		vec.pIndex = teddyJoints[i].mParentIndex;
+			vec.pIndex = teddyJoints[i].mParentIndex;
 
-		vecArray[i] = vec;
+			vecArray[i] = vec;
+		}
+	}
+	else
+	{
+		if (ind == 60)
+		{
+			ind = 0;
+		}
+		for (int i = 0; i < teddyFrames[ind].size(); i++)
+		{
+
+			debugDrawVert vec;
+			vec.pos.m128_f32[0] = teddyFrames[ind][i].global_xform[12];
+			vec.pos.m128_f32[1] = teddyFrames[ind][i].global_xform[13];
+			vec.pos.m128_f32[2] = teddyFrames[ind][i].global_xform[14];
+			vec.pos.m128_f32[3] = 1.0f;
+
+			vec.pIndex = teddyFrames[ind][i].mParentIndex;
+
+			vecArray[i] = vec;
+		}
 	}
 
 
@@ -925,6 +970,7 @@ bool WIN_APP::Run()
 
 	deviceContext->Draw(count, 0);
 	count = 0;
+
 #pragma endregion
 	swapChain->Present(0, 0);
 
