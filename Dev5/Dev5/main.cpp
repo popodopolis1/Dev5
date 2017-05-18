@@ -8,9 +8,11 @@
 #pragma comment(lib, "d3d11.lib")
 
 #include <DirectXMath.h>
+#include <chrono>
 
 using namespace std;
 using namespace DirectX;
+using namespace std::chrono;
 
 #include "GroundShader_VS.csh"
 #include "GroundShader_PS.csh"
@@ -18,6 +20,8 @@ using namespace DirectX;
 #include "DebugPS.csh"
 #include "DDSTextureLoader.h"
 #include "Export.h"
+#include "XTime.h"
+
 
 class WIN_APP
 {
@@ -141,6 +145,14 @@ public:
 	unsigned int animCount = 0;
 	unsigned int ind = 0;
 	bool animOn = false;
+	bool loop = false;
+
+	high_resolution_clock::time_point t2;
+	high_resolution_clock::time_point t1;
+	double currtime = 0.0f;
+	int currindex = 0;
+
+	XTime timer;
 #pragma endregion
 
 	WIN_APP(HINSTANCE hinst, WNDPROC proc);
@@ -676,6 +688,8 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	
 #pragma endregion
 
+	timer.Signal();
+
 }
 
 bool WIN_APP::Run()
@@ -685,6 +699,24 @@ bool WIN_APP::Run()
 #pragma endregion
 
 #pragma region Camera and Animation Controls
+
+	if (GetAsyncKeyState('L') & 0x01)
+	{
+		loop = !loop;
+		timer.Signal();
+		for (unsigned int i = 0; i < teddyFrames[currindex].size(); i++)
+		{
+			XMMATRIX boneJoint;
+			boneJoint = frameMats[currindex][i];
+			boneWorld[i].WorldMatrix = boneJoint;
+		}
+	}
+
+	if (loop == true)
+	{
+		t1 = high_resolution_clock::now();
+	}
+
 	if (GetAsyncKeyState(VK_SPACE))
 	{
 		XMMATRIX straight = XMMatrixTranslation(0, 0.05f * 2, 0);
@@ -738,6 +770,41 @@ bool WIN_APP::Run()
 		animCount++;
 	}
 
+
+	if (loop == true)
+	{
+		t2 = high_resolution_clock::now();
+		//currtime += duration_cast<duration<double>>(t2 - t1).count();
+		currtime += timer.SmoothDelta();
+	}
+
+	if (loop == true)
+	{
+		if (currindex <= 58)
+		{
+			if (currtime >= teddyFrames[currindex][0].time && currtime <= teddyFrames[currindex + 1][0].time)
+			{
+				for (unsigned int i = 0; i < teddyFrames[currindex].size(); i++)
+				{
+					XMMATRIX boneJoint;
+					boneJoint = frameMats[currindex][i];
+					boneWorld[i].WorldMatrix = boneJoint;
+				}
+				currindex = currindex + 1;
+			}
+		}
+		else
+		{
+			currindex = 0;
+			currtime = 0;
+			for (unsigned int i = 0; i < teddyFrames[currindex].size(); i++)
+			{
+				XMMATRIX boneJoint;
+				boneJoint = frameMats[currindex][i];
+				boneWorld[i].WorldMatrix = boneJoint;
+			}
+		}
+	}
 
 	POINT newPos;
 	GetCursorPos(&newPos);
@@ -871,23 +938,7 @@ bool WIN_APP::Run()
 	}
 
 	float n[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
-	if (animOn == false)
-	{
-		for (int i = 0; i < teddyJoints.size(); i++)
-		{
-
-			debugDrawVert vec;
-			vec.pos.m128_f32[0] = teddyJoints[i].global_xform[12];
-			vec.pos.m128_f32[1] = teddyJoints[i].global_xform[13];
-			vec.pos.m128_f32[2] = teddyJoints[i].global_xform[14];
-			vec.pos.m128_f32[3] = 1.0f;
-
-			vec.pIndex = teddyJoints[i].mParentIndex;
-
-			vecArray[i] = vec;
-		}
-	}
-	else
+	if (animOn == true)
 	{
 		if (ind == 60)
 		{
@@ -907,6 +958,38 @@ bool WIN_APP::Run()
 			vecArray[i] = vec;
 		}
 	}
+	else if (loop == true)
+	{
+		for (int i = 0; i < teddyFrames[currindex].size(); i++)
+		{
+
+			debugDrawVert vec;
+			vec.pos.m128_f32[0] = teddyFrames[currindex][i].global_xform[12];
+			vec.pos.m128_f32[1] = teddyFrames[currindex][i].global_xform[13];
+			vec.pos.m128_f32[2] = teddyFrames[currindex][i].global_xform[14];
+			vec.pos.m128_f32[3] = 1.0f;
+
+			vec.pIndex = teddyFrames[currindex][i].mParentIndex;
+
+			vecArray[i] = vec;
+		}
+	}
+	else
+	{
+		for (int i = 0; i < teddyJoints.size(); i++)
+		{
+
+			debugDrawVert vec;
+			vec.pos.m128_f32[0] = teddyJoints[i].global_xform[12];
+			vec.pos.m128_f32[1] = teddyJoints[i].global_xform[13];
+			vec.pos.m128_f32[2] = teddyJoints[i].global_xform[14];
+			vec.pos.m128_f32[3] = 1.0f;
+
+			vec.pIndex = teddyJoints[i].mParentIndex;
+
+			vecArray[i] = vec;
+		}
+	}
 
 
 	for (int i = 0; i < 37; i++)
@@ -919,43 +1002,6 @@ bool WIN_APP::Run()
 			}
 		}
 	}
-
-#pragma region Skeleton Setup
-	//add_debug_line(vecArray[1], vecArray[2], n);
-	//add_debug_line(vecArray[2], vecArray[3], n);
-	//add_debug_line(vecArray[3], vecArray[4], n);
-	//add_debug_line(vecArray[4], vecArray[5], n);
-	//add_debug_line(vecArray[7], vecArray[8], n);
-	//add_debug_line(vecArray[8], vecArray[9], n);
-	//add_debug_line(vecArray[9], vecArray[10], n);
-	//add_debug_line(vecArray[10], vecArray[11], n);
-	//add_debug_line(vecArray[11], vecArray[12], n);
-	//add_debug_line(vecArray[10], vecArray[13], n);
-	////add_debug_line(vecArray[7], vecArray[14], n);
-	//add_debug_line(vecArray[3], vecArray[7], n);
-	//add_debug_line(vecArray[3], vecArray[14], n);
-	//add_debug_line(vecArray[14], vecArray[15], n);
-	//add_debug_line(vecArray[15], vecArray[16], n);
-	//add_debug_line(vecArray[16], vecArray[17], n);
-	//add_debug_line(vecArray[17], vecArray[18], n);
-	//add_debug_line(vecArray[18], vecArray[19], n);
-	//add_debug_line(vecArray[17], vecArray[20], n);
-	//add_debug_line(vecArray[22], vecArray[23], n);
-	//add_debug_line(vecArray[23], vecArray[24], n);
-	//add_debug_line(vecArray[24], vecArray[25], n);
-	//add_debug_line(vecArray[25], vecArray[26], n);
-	//add_debug_line(vecArray[27], vecArray[28], n);
-	//add_debug_line(vecArray[28], vecArray[29], n);
-	//add_debug_line(vecArray[29], vecArray[30], n);
-	//add_debug_line(vecArray[32], vecArray[33], n);
-	//add_debug_line(vecArray[33], vecArray[34], n);
-	//add_debug_line(vecArray[34], vecArray[35], n);
-	//add_debug_line(vecArray[1], vecArray[32], n);
-	//add_debug_line(vecArray[1], vecArray[27], n);
-	////add_debug_line(vecArray[1], vecArray[26], n);
-	//add_debug_line(vecArray[3], vecArray[22], n);
-#pragma endregion
-
 
 	deviceContext->Map(debugBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &debugMap);
 	memcpy_s(debugMap.pData, sizeof(debugVert) * 1024, &debugArray, sizeof(debugArray));
@@ -972,6 +1018,7 @@ bool WIN_APP::Run()
 	count = 0;
 
 #pragma endregion
+
 	swapChain->Present(0, 0);
 
 	return true;

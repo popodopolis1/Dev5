@@ -218,38 +218,38 @@ namespace DllExport
 	void Export::ProcessAnimations(FbxNode * inNode)
 	{
 		#pragma region Old Code
-		FbxAMatrix geometryTransform = GetGeometryTransforms(inNode);
-
-		FbxAnimStack* animStack = mScene->GetSrcObject<FbxAnimStack>(0);
-		FbxString stackName = animStack->GetName();
-		//mAnimationName = stackName.Buffer();
-		FbxTakeInfo* info = mScene->GetTakeInfo(stackName);
-		FbxTime start = info->mLocalTimeSpan.GetStart();
-		FbxTime end = info->mLocalTimeSpan.GetStop();
-		//mAnimationLength = end.GetFrameCount(FbxTime::eFrames24) - start.GetFrameCount(FbxTime::eFrames24) + 1;
-
-		//animation.name = mAnimationName;
-		animation.duration = end.GetFrameCount(FbxTime::eFrames24) - start.GetFrameCount(FbxTime::eFrames24) + 1;;
-		//animation.numFrame = (float)end.GetFrameCount(FbxTime::eFrames24);
-
-		for (FbxLongLong z = start.GetFrameCount(FbxTime::eFrames24); z <= end.GetFrameCount(FbxTime::eFrames24); ++z)
-		{
-			FbxTime time;
-			time.SetFrame(z, FbxTime::eFrames24);
-			Keyframe* frame = new Keyframe();
-			frame->joints.resize(mSkeleton.mJoints.size());
-			frame->time = z;
-			for (int j = 0; j < mSkeleton.mJoints.size(); j++)
-			{
-				//
-				if (j != 6 && j != 21 && j != 31 && j != 36)
-				{
-					//FbxAMatrix transformOffset = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(time) * geometryTransform;
-					frame->joints[j] = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(time);
-				}
-			}
-			animation.frames.push_back(frame);
-		}
+		//FbxAMatrix geometryTransform = GetGeometryTransforms(inNode);
+		//
+		//FbxAnimStack* animStack = mScene->GetSrcObject<FbxAnimStack>(0);
+		//FbxString stackName = animStack->GetName();
+		////mAnimationName = stackName.Buffer();
+		//FbxTakeInfo* info = mScene->GetTakeInfo(stackName);
+		//FbxTime start = info->mLocalTimeSpan.GetStart();
+		//FbxTime end = info->mLocalTimeSpan.GetStop();
+		////mAnimationLength = end.GetFrameCount(FbxTime::eFrames24) - start.GetFrameCount(FbxTime::eFrames24) + 1;
+		//
+		////animation.name = mAnimationName;
+		//animation.duration = end.GetFrameCount(FbxTime::eFrames24) - start.GetFrameCount(FbxTime::eFrames24) + 1;;
+		////animation.numFrame = (float)end.GetFrameCount(FbxTime::eFrames24);
+		//
+		//for (FbxLongLong z = start.GetFrameCount(FbxTime::eFrames24); z <= end.GetFrameCount(FbxTime::eFrames24); ++z)
+		//{
+		//	FbxTime time;
+		//	time.SetFrame(z, FbxTime::eFrames24);
+		//	Keyframe* frame = new Keyframe();
+		//	frame->joints.resize(mSkeleton.mJoints.size());
+		//	frame->time = z;
+		//	for (int j = 0; j < mSkeleton.mJoints.size(); j++)
+		//	{
+		//		//
+		//		if (j != 6 && j != 21 && j != 31 && j != 36)
+		//		{
+		//			//FbxAMatrix transformOffset = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(time) * geometryTransform;
+		//			frame->joints[j] = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(time);
+		//		}
+		//	}
+		//	animation.frames.push_back(frame);
+		//}
 		#pragma endregion
 	}
 
@@ -407,7 +407,8 @@ namespace DllExport
 			FbxTime currtime;
 			currtime.SetFrame(z, FbxTime::eFrames24);
 			frame->joints.resize(mSkeleton.mJoints.size());
-			frame->time = currtime.Get();
+			frame->time = currtime.GetMilliSeconds();
+			//currtime.GetSecondDouble();
 			for (int j = 0; j < mSkeleton.mJoints.size(); j++)
 			{
 				frame->joints[j] = mSkeleton.mJoints[j].mNode->EvaluateGlobalTransform(currtime);
@@ -444,6 +445,7 @@ namespace DllExport
 				{
 					vert.global_xform[v + 12] = e.mData[v];
 				}
+				vert.time = animation.frames[i]->time;
 				vert.mParentIndex = mSkeleton.mJoints[x].mParentIndex;
 				JFrames.push_back(vert);
 			}

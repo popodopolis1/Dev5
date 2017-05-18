@@ -64,6 +64,7 @@ namespace DllExport
 	{
 		float global_xform[16];
 		int mParentIndex;
+		double time;
 	};
 
 	struct Keyframe
