@@ -296,8 +296,6 @@ namespace DllExport
 		exporter->ProcessSkeletonHierarchy(node);
 		//exporter->ProcessJoints(node);
 
-
-
 		FbxPose* pose;
 		
 		for (int i = 0; i < scene->GetPoseCount(); i++)

@@ -770,12 +770,25 @@ bool WIN_APP::Run()
 		animCount++;
 	}
 
+	  
+	//XMVECTOR ve1 = XMQuaternionRotationMatrix(boneWorld[0].WorldMatrix);
+	//XMVECTOR ve2 = XMQuaternionRotationMatrix(boneWorld[1].WorldMatrix);
+	//XMVECTOR ve3 = XMQuaternionSlerp(ve1, ve2, 0.5f);
+	//XMMATRIX ma = XMMatrixRotationQuaternion(ve3);
+
 
 	if (loop == true)
 	{
 		t2 = high_resolution_clock::now();
 		//currtime += duration_cast<duration<double>>(t2 - t1).count();
-		currtime += timer.SmoothDelta();
+		if (wireDraw == true)
+		{
+			currtime += timer.SmoothDelta() / 2.0f;
+		}
+		else
+		{
+			currtime += timer.SmoothDelta() / 3.0f;
+		}
 	}
 
 	if (loop == true)
@@ -991,7 +1004,7 @@ bool WIN_APP::Run()
 		}
 	}
 
-
+	
 	for (int i = 0; i < 37; i++)
 	{
 		for (int x = 0; x < 37; x++)

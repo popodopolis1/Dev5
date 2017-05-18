@@ -8,3 +8,7 @@ Left Shift = Move Camera Straight Down
 
 -Rendering-
 Q = Turn Wireframe Mesh On and Off
+
+-Animation-
+N = Keyframe press
+L = Looping animation
