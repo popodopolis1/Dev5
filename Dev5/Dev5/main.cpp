@@ -142,6 +142,7 @@ public:
 	debugDrawVert vecArray[37];
 
 	bool wireDraw = false;
+	bool solidDraw = false;
 	unsigned int animCount = 0;
 	unsigned int ind = 0;
 	bool animOn = false;
@@ -703,6 +704,7 @@ bool WIN_APP::Run()
 	if (GetAsyncKeyState('L') & 0x01)
 	{
 		loop = !loop;
+		animOn = false;
 		timer.Signal();
 		for (unsigned int i = 0; i < teddyFrames[currindex].size(); i++)
 		{
@@ -755,6 +757,7 @@ bool WIN_APP::Run()
 	if (GetAsyncKeyState('N') & 0x01)
 	{
 		animOn = true;
+		loop = false;
 		if (animCount == teddyFrames.size())
 		{
 			animCount = 0;
@@ -769,13 +772,6 @@ bool WIN_APP::Run()
 
 		animCount++;
 	}
-
-	  
-	//XMVECTOR ve1 = XMQuaternionRotationMatrix(boneWorld[0].WorldMatrix);
-	//XMVECTOR ve2 = XMQuaternionRotationMatrix(boneWorld[1].WorldMatrix);
-	//XMVECTOR ve3 = XMQuaternionSlerp(ve1, ve2, 0.5f);
-	//XMMATRIX ma = XMMatrixRotationQuaternion(ve3);
-
 
 	if (loop == true)
 	{
@@ -806,16 +802,29 @@ bool WIN_APP::Run()
 				currindex = currindex + 1;
 			}
 		}
-		else
+		else if(currindex == 59)
 		{
+			if (currtime >= teddyFrames[currindex][0].time)
+			{
+				for (unsigned int i = 0; i < teddyFrames[currindex].size(); i++)
+				{
+					XMMATRIX boneJoint;
+					boneJoint = frameMats[currindex][i];
+					boneWorld[i].WorldMatrix = boneJoint;
+				}
+			}
 			currindex = 0;
 			currtime = 0;
-			for (unsigned int i = 0; i < teddyFrames[currindex].size(); i++)
-			{
-				XMMATRIX boneJoint;
-				boneJoint = frameMats[currindex][i];
-				boneWorld[i].WorldMatrix = boneJoint;
-			}
+		}
+	}
+
+	if (animOn == false && loop == false)
+	{
+		for (int i = 0; i < teddyJoints.size(); i++)
+		{
+			XMMATRIX boneJoint;
+			boneJoint = floatArrayToMatrix(teddyJoints[i].global_xform);
+			boneWorld[i].WorldMatrix = boneJoint;
 		}
 	}
 
@@ -851,6 +860,13 @@ bool WIN_APP::Run()
 	if (GetAsyncKeyState('Q') & 0x1)
 	{
 		wireDraw = !wireDraw;
+		solidDraw = false;
+	}
+
+	if (GetAsyncKeyState('E') & 0x1)
+	{
+		solidDraw = !solidDraw;
+		wireDraw = false;
 	}
 #pragma endregion
 
@@ -922,9 +938,14 @@ bool WIN_APP::Run()
 	deviceContext->PSSetShaderResources(0, 1, &teddyshaderView);
 	deviceContext->PSSetSamplers(0, 1, &teddySample);
 
-	deviceContext->RSSetState(wireState);
-	if (wireDraw == true)
+	if (wireDraw == true && solidDraw == false)
 	{
+		deviceContext->RSSetState(wireState);
+		deviceContext->DrawIndexed(teddyVertCount, 0, 0);
+	}
+	if (solidDraw == true && wireDraw == false)
+	{
+		deviceContext->RSSetState(solidState);
 		deviceContext->DrawIndexed(teddyVertCount, 0, 0);
 	}
 #pragma endregion
@@ -950,6 +971,7 @@ bool WIN_APP::Run()
 		deviceContext->DrawIndexed(boneVertcount, 0, 0);
 	}
 
+
 	float n[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
 	if (animOn == true)
 	{
@@ -973,9 +995,12 @@ bool WIN_APP::Run()
 	}
 	else if (loop == true)
 	{
+		if (currindex == 60)
+		{
+			currindex = 0;
+		}
 		for (int i = 0; i < teddyFrames[currindex].size(); i++)
 		{
-
 			debugDrawVert vec;
 			vec.pos.m128_f32[0] = teddyFrames[currindex][i].global_xform[12];
 			vec.pos.m128_f32[1] = teddyFrames[currindex][i].global_xform[13];
