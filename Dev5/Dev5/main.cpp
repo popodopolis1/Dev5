@@ -49,8 +49,28 @@ class WIN_APP
 		XMMATRIX ProjectionMatrix;
 	};
 
+	struct Light
+	{
+		XMFLOAT3 direction;
+		float pointRadius;
+		XMFLOAT4 color;
+
+		XMFLOAT4 pointPosition;
+		XMFLOAT4 pointColor;
+
+		XMFLOAT4 spotColor;
+		XMFLOAT4 spotPosition;
+		XMFLOAT4 spotDirection;
+		float spotRadius;
+
+		XMFLOAT3 padding;
+
+		XMFLOAT4 camPosition;
+	};
+
 	View view;
 	World groundWorld;
+	Light light;
 
 	ID3D11Texture2D* depthStencil = NULL;
 	D3D11_TEXTURE2D_DESC depthDesc;
@@ -154,6 +174,9 @@ public:
 	int currindex = 0;
 
 	XTime timer;
+
+	ID3D11Buffer *lightBuffer;
+	D3D11_BUFFER_DESC lightBufferdesc;
 #pragma endregion
 
 	WIN_APP(HINSTANCE hinst, WNDPROC proc);
@@ -380,12 +403,68 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma endregion
 
+#pragma region Lighting Initialization
+	light.color = { 1,1,1,1 };
+	light.direction = { -1.0f, -0.75f, 0.0f };
+
+	light.pointPosition = { 0, -3, 0, 1 };
+	light.pointColor = { 0.0f, 1.0f, 1.0f, 1.0f };
+	light.pointRadius = 10;
+
+	light.spotColor = { 1.0f, 1.0f, 0.0f, 1.0f };
+	light.spotDirection = { 0, 0, 1, 1 };
+	light.spotPosition = { -5, 0, -10, 1 };
+	light.spotRadius = 0.93f;
+
+	lightBufferdesc.Usage = D3D11_USAGE_DYNAMIC;
+	lightBufferdesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	lightBufferdesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	lightBufferdesc.ByteWidth = sizeof(Light);
+	lightBufferdesc.MiscFlags = 0;
+	lightBufferdesc.StructureByteStride = 0;
+
+	InitData.pSysMem = &light;
+	device->CreateBuffer(&lightBufferdesc, &InitData, &lightBuffer);
+
+#pragma endregion
+
 #pragma region Teddy Initialization
 	vector<DllExport::PNUVertex> verts;
+	//vector<DllExport::PNUVertex> verts2;
 	DllExport::Export test;
 
 	verts = test.LoadFBX(verts, "Teddy_Idle.fbx");
 	teddyVertCount = (int)verts.size();
+
+	//vector<int> teddyInd;
+	//bool z = false;
+	//for (int i = 0; i < teddyVertCount; i++)
+	//{
+	//	if (verts2.size() != 0)
+	//	{
+	//		for (int x = 0; x < verts2.size(); x++)
+	//		{
+	//			if (verts[i].mPosition.x == verts2[x].mPosition.x && verts[i].mPosition.y == verts2[x].mPosition.y && verts[i].mPosition.z == verts2[x].mPosition.z)
+	//			{
+	//				verts2.push_back(verts[i]);
+	//				teddyInd.push_back(x);
+	//				z = true;
+	//				break;
+	//			}
+	//		}
+	//		if (z == true)
+	//		{
+	//			verts2.push_back(verts[i]);
+	//			teddyInd.push_back(i);
+	//
+	//		}
+	//	}
+	//	else
+	//	{
+	//		verts2.push_back(verts[i]);
+	//		teddyInd.push_back(i);
+	//	}
+	//}
 
 	teddyJoints = test.GetJoints(teddyJoints, "Teddy_Idle.fbx");
 
@@ -405,6 +484,9 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 			frameMats[i].push_back(temp);
 		}
 	}
+
+	vector<DllExport::vert_pos_skinned> testSkinned;
+	testSkinned = test.GetWeights(testSkinned, "Teddy_Idle.fbx");
 
 	GVERTEX* teddyVerts = new GVERTEX[teddyVertCount];
 	unsigned int* teddyIndicies = new unsigned int[teddyVertCount];
@@ -697,6 +779,7 @@ bool WIN_APP::Run()
 {
 #pragma region View Matrix Inverse
 	view.ViewMatrix = XMMatrixInverse(0, view.ViewMatrix);
+	light.camPosition = { view.ViewMatrix.r[3].m128_f32[0], view.ViewMatrix.r[3].m128_f32[1], view.ViewMatrix.r[3].m128_f32[2], view.ViewMatrix.r[3].m128_f32[3] };
 #pragma endregion
 
 #pragma region Camera and Animation Controls
@@ -828,6 +911,23 @@ bool WIN_APP::Run()
 		}
 	}
 
+	if (GetAsyncKeyState(VK_UP))
+	{
+		light.direction = { light.direction.x, light.direction.y + (float)(0.001f), light.direction.z };
+	}
+	if (GetAsyncKeyState(VK_DOWN))
+	{
+		light.direction = { light.direction.x, light.direction.y - (float)(0.001f), light.direction.z };
+	}
+	if (GetAsyncKeyState(VK_LEFT))
+	{
+		light.direction = { light.direction.x - (float)(0.001f), light.direction.y, light.direction.z };
+	}
+	if (GetAsyncKeyState(VK_RIGHT))
+	{
+		light.direction = { light.direction.x + (float)(0.001f), light.direction.y, light.direction.z };
+	}
+
 	POINT newPos;
 	GetCursorPos(&newPos);
 	if (GetAsyncKeyState(VK_LBUTTON))
@@ -876,6 +976,7 @@ bool WIN_APP::Run()
 	D3D11_MAPPED_SUBRESOURCE viewMap;
 	D3D11_MAPPED_SUBRESOURCE groundMap;
 	D3D11_MAPPED_SUBRESOURCE debugMap;
+	D3D11_MAPPED_SUBRESOURCE lightMap;
 	UINT stride = sizeof(GVERTEX);
 	UINT stride2 = sizeof(debugVert);
 	UINT offset = 0;
@@ -887,6 +988,10 @@ bool WIN_APP::Run()
 	deviceContext->Map(groundConstant, 0, D3D11_MAP_WRITE_DISCARD, NULL, &groundMap);
 	memcpy_s(groundMap.pData, sizeof(World), &groundWorld, sizeof(World));
 	deviceContext->Unmap(groundConstant, 0);
+
+	deviceContext->Map(lightBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &lightMap);
+	memcpy_s(lightMap.pData, sizeof(Light), &light, sizeof(Light));
+	deviceContext->Unmap(lightBuffer, 0);
 
 	for (size_t i = 0; i < teddyJoints.size(); i++)
 	{
@@ -905,6 +1010,8 @@ bool WIN_APP::Run()
 
 	float rgba[4] = { 0.0f, 1.0f, 1.0f, 0.0f };
 	deviceContext->ClearRenderTargetView(RTV, rgba);
+
+	deviceContext->PSSetConstantBuffers(0, 1, &lightBuffer);
 
 	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 

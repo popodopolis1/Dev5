@@ -453,6 +453,75 @@ namespace DllExport
 		return outFrames;
 	}
 
+	std::vector<vert_pos_skinned> Export::GetWeights(std::vector<vert_pos_skinned> outWeights, const char * file)
+	{
+		Export* exporter = new Export();
+		exporter->Initialize();
+		exporter->LoadScene(file);
+		FbxScene* scene = exporter->getScene();
+		FbxNode* node = scene->GetRootNode();
+		exporter->ProcessControlPoints(node);
+		exporter->ProcessMesh(scene->GetRootNode());
+		//exporter->ProcessSkeletonHierarchy(node);
+
+		FbxPose* pose;
+
+		for (int i = 0; i < scene->GetPoseCount(); i++)
+		{
+			pose = scene->GetPose(i);
+			if (pose->IsBindPose())
+			{
+				break;
+			}
+		}
+
+		FbxMesh* mesh;
+		for (int i = 0; i < pose->GetCount(); i++)
+		{
+			FbxNode* fbxnode = pose->GetNode(i);
+			mesh = fbxnode->GetMesh();
+			if (mesh != nullptr)
+			{
+				break;
+			}
+		}
+
+		
+		FbxDeformer* deformer;
+		for (int i = 0; i < mesh->GetDeformerCount(); i++)
+		{
+			deformer = mesh->GetDeformer(i);
+			if (deformer->GetDeformerType() == FbxDeformer::eSkin)
+			{
+				break;
+			}
+		}
+		
+		FbxSkin* skin = reinterpret_cast<FbxSkin*>(deformer);
+		FbxCluster* cluster;
+		for (int i = 0; i < skin->GetClusterCount(); i++)
+		{
+			cluster = skin->GetCluster(i);
+			FbxNode* node = cluster->GetLink();
+			for (int x = 0; x < mSkeleton.mJoints.size(); x++)
+			{
+				if (node == mSkeleton.mJoints[x].mNode)
+				{
+					vert_pos_skinned vps;
+					for (int y = 0; y < cluster->GetControlPointIndicesCount(); y++)
+					{
+						//vps.weights.push_back(cluster->GetControlPointWeights()[y]);
+						//vps.joints[y] = x;
+						//vps.pos->push_back(cluster->GetControlPointIndices()[y]);
+					}
+					outWeights.push_back(vps);
+				}
+			}
+		}
+
+		return outWeights;
+	}
+
 	void Export::ReadUV(FbxMesh * inMesh, int inCtrlPointIndex, int inTextureUVIndex, int inUVLayer, XMFLOAT2 & outUV)
 	{
 		if (inUVLayer >= 2 || inMesh->GetElementUVCount() <= inUVLayer)

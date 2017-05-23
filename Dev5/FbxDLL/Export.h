@@ -79,6 +79,13 @@ namespace DllExport
 		vector<Keyframe*> frames;
 	};
 
+	struct vert_pos_skinned
+	{
+		vector<float> pos[3];
+		int joints[4];
+		vector<float> weights[4];
+	};
+
 	class DLLEXPORT Export
 	{
 	public:
@@ -98,6 +105,7 @@ namespace DllExport
 		std::vector<PNUVertex> LoadFBX(std::vector<PNUVertex> outVerts, const char* file);
 		std::vector<JointMatrix> GetJoints(std::vector<JointMatrix> outJoints, const char* file);
 		std::vector<vector<JointMatrix>> GetKeyframes(std::vector<vector<JointMatrix>> outFrames, const char * file);
+		std::vector<vert_pos_skinned> GetWeights(std::vector<vert_pos_skinned> outJoints, const char* file);
 		void ReadUV(FbxMesh* inMesh, int inCtrlPointIndex, int inTextureUVIndex, int inUVLayer, XMFLOAT2& outUV);
 		void ReadNormal(FbxMesh* inMesh, int inCtrlPointIndex, int inVertexCounter, XMFLOAT3& outNormal);
 		void ReadBinormal(FbxMesh* inMesh, int inCtrlPointIndex, int inVertexCounter, XMFLOAT3& outBinormal);
