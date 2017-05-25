@@ -510,7 +510,7 @@ namespace DllExport
 					vert_pos_skinned vps;
 					for (int y = 0; y < cluster->GetControlPointIndicesCount(); y++)
 					{
-						//vps.weights.push_back(cluster->GetControlPointWeights()[y]);
+						cluster->GetControlPointWeights()[y];
 						//vps.joints[y] = x;
 						//vps.pos->push_back(cluster->GetControlPointIndices()[y]);
 					}

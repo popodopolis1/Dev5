@@ -84,6 +84,7 @@ class WIN_APP
 	ID3D11RasterizerState* wireState;
 	vector<World> boneWorld;
 	vector<XMMATRIX> jointMats;
+	vector<XMMATRIX> weaponjointMats;
 	vector<vector<XMMATRIX>> frameMats;
 #pragma endregion
 
@@ -177,6 +178,20 @@ public:
 
 	ID3D11Buffer *lightBuffer;
 	D3D11_BUFFER_DESC lightBufferdesc;
+
+	ID3D11Buffer* weaponBuffer;
+	ID3D11Buffer* weaponIndex;
+	D3D11_BUFFER_DESC weaponVertBuffDesc;
+	D3D11_BUFFER_DESC weaponIndBuffDesc;
+	ID3D11ShaderResourceView *weaponshaderView;
+	ID3D11SamplerState *weaponSample;
+	D3D11_SAMPLER_DESC weaponsampleDesc;
+	ID3D11Buffer* weaponConstant;
+	D3D11_BUFFER_DESC weaponConstantdesc;
+	int weaponVertCount;
+	vector<DllExport::JointMatrix> weaponJoints;
+	World weaponWorld;
+	//XMMATRIX weaponWorld;
 #pragma endregion
 
 	WIN_APP(HINSTANCE hinst, WNDPROC proc);
@@ -542,6 +557,79 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 	delete[] teddyIndicies;
 #pragma endregion
 
+#pragma region Weapon Initialization
+	vector<DllExport::PNUVertex> verts2;
+	//vector<DllExport::PNUVertex> verts2;
+	DllExport::Export test2;
+
+	verts2 = test2.LoadFBX(verts2, "spear.fbx");
+	weaponVertCount = (int)verts2.size();
+
+	GVERTEX* weaponVerts = new GVERTEX[weaponVertCount];
+	unsigned int*weaponIndicies = new unsigned int[weaponVertCount];
+
+	DllExport::PNUVertex* weaponArray = &verts2[0];
+	for (int i = 0; i < weaponVertCount; i++)
+	{
+		weaponVerts[i].pos = { weaponArray[i].mPosition.x, weaponArray[i].mPosition.y, weaponArray[i].mPosition.z, 0.0f };
+		weaponVerts[i].color = { 0, 0, 0, 0 };
+		weaponVerts[i].uv.x = weaponArray[i].mUV.x;
+		weaponVerts[i].uv.y = weaponArray[i].mUV.y;
+		weaponVerts[i].normal.x = weaponArray[i].mNormal.x;
+		weaponVerts[i].normal.y = weaponArray[i].mNormal.y;
+		weaponVerts[i].normal.z = weaponArray[i].mNormal.z;
+		weaponIndicies[i] = i;
+	}
+
+	weaponVertBuffDesc.Usage = D3D11_USAGE_IMMUTABLE;
+	weaponVertBuffDesc.ByteWidth = sizeof(GVERTEX)*weaponVertCount;
+	weaponVertBuffDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	weaponVertBuffDesc.CPUAccessFlags = 0;
+	weaponVertBuffDesc.MiscFlags = 0;
+	weaponVertBuffDesc.StructureByteStride = 0;
+
+	InitData.pSysMem = weaponVerts;
+	device->CreateBuffer(&weaponVertBuffDesc, &InitData, &weaponBuffer);
+
+	weaponIndBuffDesc.Usage = D3D11_USAGE_IMMUTABLE;
+	weaponIndBuffDesc.ByteWidth = sizeof(unsigned long)*weaponVertCount;
+	weaponIndBuffDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	weaponIndBuffDesc.CPUAccessFlags = 0;
+	weaponIndBuffDesc.MiscFlags = 0;
+	weaponIndBuffDesc.StructureByteStride = 0;
+
+	InitData.pSysMem = weaponIndicies;
+	device->CreateBuffer(&weaponIndBuffDesc, &InitData, &weaponIndex);
+
+	weaponConstantdesc.Usage = D3D11_USAGE_DYNAMIC;
+	weaponConstantdesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	weaponConstantdesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	weaponConstantdesc.ByteWidth = sizeof(World);
+	weaponConstantdesc.MiscFlags = 0;
+	weaponConstantdesc.StructureByteStride = 0;
+
+	weaponWorld.WorldMatrix = XMMatrixIdentity();
+	InitData.pSysMem = &weaponWorld;
+	device->CreateBuffer(&weaponConstantdesc, &InitData, &weaponConstant);
+
+	weaponsampleDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	weaponsampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	weaponsampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	weaponsampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	weaponsampleDesc.MinLOD = (-FLT_MAX);
+	weaponsampleDesc.MaxLOD = (FLT_MAX);
+	weaponsampleDesc.MipLODBias = 0.0f;
+	weaponsampleDesc.MaxAnisotropy = 1;
+	weaponsampleDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	weaponsampleDesc.BorderColor[0] = 1;
+	weaponsampleDesc.BorderColor[1] = 1;
+	weaponsampleDesc.BorderColor[2] = 1;
+	weaponsampleDesc.BorderColor[3] = 1;
+
+	delete[] weaponVerts;
+	delete[] weaponIndicies;
+#pragma endregion
+
 #pragma region Bone Loading
 
 	vector<DllExport::PNUVertex> bonefbxVerts;
@@ -730,6 +818,7 @@ WIN_APP::WIN_APP(HINSTANCE hinst, WNDPROC proc)
 
 	device->CreateSamplerState(&groundsampleDesc, &groundSample);
 	device->CreateSamplerState(&teddysampleDesc, &teddySample);
+	device->CreateSamplerState(&weaponsampleDesc, &weaponSample);
 	device->CreateSamplerState(&bonesampleDesc, &boneSample);
 	device->CreateInputLayout(groundLayout, ARRAYSIZE(groundLayout), GroundShader_VS, sizeof(GroundShader_VS), &groundInputlayout);
 	device->CreateInputLayout(debugLayout, ARRAYSIZE(debugLayout), DebugVS, sizeof(DebugVS), &debugInputlayout);
@@ -780,6 +869,7 @@ bool WIN_APP::Run()
 #pragma region View Matrix Inverse
 	view.ViewMatrix = XMMatrixInverse(0, view.ViewMatrix);
 	light.camPosition = { view.ViewMatrix.r[3].m128_f32[0], view.ViewMatrix.r[3].m128_f32[1], view.ViewMatrix.r[3].m128_f32[2], view.ViewMatrix.r[3].m128_f32[3] };
+	weaponWorld.WorldMatrix = boneWorld[33].WorldMatrix;
 #pragma endregion
 
 #pragma region Camera and Animation Controls
@@ -977,6 +1067,7 @@ bool WIN_APP::Run()
 	D3D11_MAPPED_SUBRESOURCE groundMap;
 	D3D11_MAPPED_SUBRESOURCE debugMap;
 	D3D11_MAPPED_SUBRESOURCE lightMap;
+	D3D11_MAPPED_SUBRESOURCE weaponMap;
 	UINT stride = sizeof(GVERTEX);
 	UINT stride2 = sizeof(debugVert);
 	UINT offset = 0;
@@ -992,6 +1083,10 @@ bool WIN_APP::Run()
 	deviceContext->Map(lightBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &lightMap);
 	memcpy_s(lightMap.pData, sizeof(Light), &light, sizeof(Light));
 	deviceContext->Unmap(lightBuffer, 0);
+
+	deviceContext->Map(weaponConstant, 0, D3D11_MAP_WRITE_DISCARD, NULL, &weaponMap);
+	memcpy_s(weaponMap.pData, sizeof(World), &weaponWorld, sizeof(World));
+	deviceContext->Unmap(weaponConstant, 0);
 
 	for (size_t i = 0; i < teddyJoints.size(); i++)
 	{
@@ -1055,6 +1150,23 @@ bool WIN_APP::Run()
 		deviceContext->RSSetState(solidState);
 		deviceContext->DrawIndexed(teddyVertCount, 0, 0);
 	}
+#pragma endregion
+
+#pragma region Weapon Setup and Drawing
+	
+	deviceContext->VSSetConstantBuffers(0, 1, &weaponConstant);
+	deviceContext->IASetVertexBuffers(0, 1, &weaponBuffer, &stride, &offset);
+	deviceContext->IASetIndexBuffer(weaponIndex, DXGI_FORMAT_R32_UINT, 0);
+	//deviceContext->PSSetShaderResources(0, 1, &groundshaderView);
+	//deviceContext->PSSetSamplers(0, 1, &weaponSample);
+	deviceContext->IASetInputLayout(groundInputlayout);
+	deviceContext->VSSetShader(groundVertshader, NULL, 0);
+	deviceContext->PSSetShader(groundPixshader, NULL, 0);
+	deviceContext->PSSetShaderResources(0, 1, &groundshaderView);
+	deviceContext->PSSetSamplers(0, 1, &groundSample);
+	
+	deviceContext->RSSetState(solidState);
+	deviceContext->DrawIndexed(weaponVertCount, 0, 0);
 #pragma endregion
 
 #pragma region Joint and Skeleton Setup and Drawing
