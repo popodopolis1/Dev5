@@ -952,11 +952,11 @@ bool WIN_APP::Run()
 		//currtime += duration_cast<duration<double>>(t2 - t1).count();
 		if (wireDraw == true)
 		{
-			currtime += timer.SmoothDelta() / 2.0f;
+			currtime += timer.SmoothDelta() / 3.0f;
 		}
 		else
 		{
-			currtime += timer.SmoothDelta() / 3.0f;
+			currtime += timer.SmoothDelta() / 4.0f;
 		}
 	}
 
